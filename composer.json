@@ -1,0 +1,24 @@
+{
+    "name": "bfolliot/feed-importer",
+    "description": "WordPress plugin to import post from RSS or Atom feed.",
+    "license": "BSD-3-Clause",
+    "authors": [
+        {
+            "name": "Bryan Folliot",
+            "email": "dev@bryanfolliot.fr"
+        }
+    ],
+    "type": "wordpress-plugin",
+    "require": {
+        "php": ">=5.4",
+        "composer/installers": "~1.0",
+        "zendframework/zend-feed": "~2.7",
+        "zendframework/zend-http": "~2.5"
+    },
+    "require-dev": {
+        "m6web/coke": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {"BFolliot\\FeedImporter\\": "src"}
+    }
+}
