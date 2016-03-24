@@ -14,3 +14,31 @@ This plugin help you to create post from feed (RSS or Atom).
 
 
 Development of this plugin is done on [GitHub](https://github.com/bfolliot/feed-importer). Pull requests welcome. Please see [issues](https://github.com/bfolliot/feed-importer/issues) reported there before going to the plugin forum.
+
+
+== Instalation ==
+
+Feed Importer use [composer](https://getcomposer.org/), if you already use composer in your project, juste add bfolliot/feed-importer in your composer.json :
+
+
+```json
+{
+    "require": {
+        "bfolliot/feed-importer": "~0.1"
+    }
+}
+```
+
+If you do not use it (you should really consider using it to manage your project), in your plugins directory (by default, `wp-content/plugins`) :
+
+```sh
+git clone --branch 0.1.0 https://github.com/bfolliot/feed-importer.git
+cd feed-importer
+```
+
+[Get composer](https://getcomposer.org/download/) and run :
+
+```sh
+composer.phar install
+```
+
