@@ -18,6 +18,11 @@ class Importer implements ImporterInterface
 {
 
     /**
+     * @var callable
+     */
+    private $postInsertCallback;
+
+    /**
      * { @inheritdoc }
      */
     public function import($uri, $postType = 'post')
@@ -67,6 +72,8 @@ class Importer implements ImporterInterface
 
     /**
      * Create post from entry
+     * If you set a callable with setPostInsertCallback(),
+     * he will be triggered after insert with postId as parameter.
      *
      * @param EntryInterface $entry
      * @param  string $postType The post type name, default to "post"
@@ -98,9 +105,23 @@ class Importer implements ImporterInterface
             if ($entry->getAuthors()) {
                 add_post_meta($postId, 'feed_importer_feed_entry_link', $entry->getAuthors()->getValues());
             }
-            if (function_exists('pll_set_post_language')) {
-                pll_set_post_language($postId, 'en');
+            if (is_callable($this->postInsertCallback)) {
+                call_user_func($this->postInsertCallback, $postId);
             }
         }
+    }
+
+    /**
+     * Sets the value of postInsertCallback.
+     *
+     * @param callable $postInsertCallback the post insert callback
+     *
+     * @return self
+     */
+    public function setPostInsertCallback(callable $postInsertCallback)
+    {
+        $this->postInsertCallback = $postInsertCallback;
+
+        return $this;
     }
 }
