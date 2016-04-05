@@ -23,9 +23,14 @@ class Importer implements ImporterInterface
     private $postInsertCallback;
 
     /**
+     * @var callable
+     */
+    private $termInsertCallback;
+
+    /**
      * { @inheritdoc }
      */
-    public function import($uri, $postType = 'post')
+    public function import($uri, $postType = 'post', $taxonomyType = null)
     {
         if (empty($uri) || !is_string($uri)) {
             throw new InvalidArgumentException('Uri is required.');
@@ -40,7 +45,10 @@ class Importer implements ImporterInterface
 
         foreach ($feed as $entry) {
             if ($this->entryIsNew($entry, $postType)) {
-                $this->createPostFromEntry($entry, $postType);
+                $postId = $this->createPostFromEntry($entry, $postType);
+                if (!empty($taxonomyType)) {
+                    $this->createTermsFromEntry($postId, $entry, $taxonomyType);
+                }
             }
         }
     }
@@ -109,6 +117,35 @@ class Importer implements ImporterInterface
                 call_user_func($this->postInsertCallback, $postId);
             }
         }
+
+        return $postId;
+    }
+
+    /**
+     * Create taxonomy terms from entry
+     *
+     * @param integer $postId
+     * @param EntryInterface $entry
+     * @param string $taxonomyType The taxonomy type name
+     */
+    private function createTermsFromEntry($postId, EntryInterface $entry, $taxonomyType)
+    {
+        $ids = [];
+        foreach ($entry->getCategories() as $category) {
+            $term = term_exists($category['term'], $taxonomyType);
+
+            if ($term === 0 || $term === null) {
+                $term = wp_insert_term($category['term'], $taxonomyType);
+                if (is_array($term) && is_callable($this->termInsertCallback)) {
+                    call_user_func($this->termInsertCallback, $term['term_id']);
+                }
+            }
+
+            $ids[] = (int) $term['term_id'];
+        }
+        if (!empty($ids)) {
+            wp_set_post_terms($postId, $ids, $taxonomyType);
+        }
     }
 
     /**
@@ -121,6 +158,20 @@ class Importer implements ImporterInterface
     public function setPostInsertCallback(callable $postInsertCallback)
     {
         $this->postInsertCallback = $postInsertCallback;
+
+        return $this;
+    }
+
+    /**
+     * Sets the value of termInsertCallback.
+     *
+     * @param callable $termInsertCallback the term insert callback
+     *
+     * @return self
+     */
+    public function setTermInsertCallback(callable $termInsertCallback)
+    {
+        $this->termInsertCallback = $termInsertCallback;
 
         return $this;
     }
