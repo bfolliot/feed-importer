@@ -30,7 +30,7 @@ class Importer implements ImporterInterface
     /**
      * { @inheritdoc }
      */
-    public function import($uri, $postType = 'post', $taxonomyType = null)
+    public function import($uri, $postType = 'post', $taxonomyType = null, $language = false)
     {
         if (empty($uri) || !is_string($uri)) {
             throw new InvalidArgumentException('Uri is required.');
@@ -44,10 +44,10 @@ class Importer implements ImporterInterface
         $feed = Reader::import($uri);
 
         foreach ($feed as $entry) {
-            if ($this->entryIsNew($entry, $postType)) {
-                $postId = $this->createPostFromEntry($entry, $postType);
+            if ($this->entryIsNew($entry, $postType, $language)) {
+                $postId = $this->createPostFromEntry($entry, $postType, $language);
                 if (!empty($taxonomyType)) {
-                    $this->createTermsFromEntry($postId, $entry, $taxonomyType);
+                    $this->createTermsFromEntry($postId, $entry, $taxonomyType, $language);
                 }
             }
         }
@@ -58,10 +58,11 @@ class Importer implements ImporterInterface
      *
      * @param EntryInterface $entry
      * @param  string $postType The post type name, default to "post"
+     * @param  string $language Optionnal Polylang language
      *
      * @return bool
      */
-    private function entryIsNew(EntryInterface $entry, $postType = 'post')
+    private function entryIsNew(EntryInterface $entry, $postType = 'post', $language = false)
     {
         $queryArgs = [
             'post_type'   => $postType,
@@ -74,6 +75,10 @@ class Importer implements ImporterInterface
             ],
         ];
 
+        if ($language) {
+            $queryArgs['lang'] = $language;
+        }
+
         $query = new WP_Query($queryArgs);
         return ($query->post_count == 0);
     }
@@ -85,8 +90,9 @@ class Importer implements ImporterInterface
      *
      * @param EntryInterface $entry
      * @param  string $postType The post type name, default to "post"
+     * @param  string $language Optionnal Polylang language
      */
-    private function createPostFromEntry(EntryInterface $entry, $postType = 'post')
+    private function createPostFromEntry(EntryInterface $entry, $postType = 'post', $language = false)
     {
         $date = (!empty($entry->getDateModified()))
             ? $entry->getDateModified()->format('Y-m-d H:i:s')
@@ -113,6 +119,11 @@ class Importer implements ImporterInterface
             if ($entry->getAuthors()) {
                 add_post_meta($postId, 'feed_importer_feed_entry_link', $entry->getAuthors()->getValues());
             }
+
+            if ($language && function_exists('pll_set_post_language')) {
+                pll_set_post_language($postId, $language);
+            }
+
             if (is_callable($this->postInsertCallback)) {
                 call_user_func($this->postInsertCallback, $postId);
             }
@@ -127,8 +138,9 @@ class Importer implements ImporterInterface
      * @param integer $postId
      * @param EntryInterface $entry
      * @param string $taxonomyType The taxonomy type name
+     * @param  string $language Optionnal Polylang language
      */
-    private function createTermsFromEntry($postId, EntryInterface $entry, $taxonomyType)
+    private function createTermsFromEntry($postId, EntryInterface $entry, $taxonomyType, $language = false)
     {
         $ids = [];
         foreach ($entry->getCategories() as $category) {
@@ -136,8 +148,13 @@ class Importer implements ImporterInterface
 
             if ($term === 0 || $term === null) {
                 $term = wp_insert_term($category['term'], $taxonomyType);
-                if (is_array($term) && is_callable($this->termInsertCallback)) {
-                    call_user_func($this->termInsertCallback, $term['term_id']);
+                if (is_array($term)) {
+                    if ($language && function_exists('pll_set_term_language')) {
+                        pll_set_term_language($postId, $language);
+                    }
+                    if (is_callable($this->termInsertCallback)) {
+                        call_user_func($this->termInsertCallback, $term['term_id']);
+                    }
                 }
             }
 

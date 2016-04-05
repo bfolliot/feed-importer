@@ -16,9 +16,11 @@ interface ImporterInterface
      *
      * @param  string $uri The URI to the feed
      * @param  string $postType The post type name, default to "post"
+     * @param  string $taxonomyType Optional taxonomy type name to match with feed category
+     * @param  string $language Optionnal Polylang language
      *
      * @throws RuntimeException
      * @throws InvalidArgumentException
      */
-    public function import($uri, $postType);
+    public function import($uri, $postType = 'post', $taxonomyType = null, $language = false);
 }
