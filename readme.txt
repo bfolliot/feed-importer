@@ -24,7 +24,7 @@ Feed Importer use [composer](https://getcomposer.org/), if you already use compo
 ```json
 {
     "require": {
-        "bfolliot/feed-importer": "~0.3"
+        "bfolliot/feed-importer": "~0.5"
     }
 }
 ```

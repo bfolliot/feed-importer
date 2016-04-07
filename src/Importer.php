@@ -34,6 +34,17 @@ class Importer implements ImporterInterface
         'afterInsertTerm' => null,
         'taxonomy'        => null,
         'authorId'        => 1,
+        'status'          => 'draft',
+    ];
+
+    /**
+     * @var array
+     */
+    protected $validStatus = [
+        'draft',
+        'pending',
+        'private',
+        'publish',
     ];
 
     /**
@@ -112,6 +123,7 @@ class Importer implements ImporterInterface
           'post_author'  => $this->entryParams['authorId'],
           'post_content' => wp_kses_post($entry->getContent()),
           'post_date'    => $date,
+          'post_status'  => $this->entryParams['status'],
           'post_title'   => wp_strip_all_tags($entry->getTitle()),
           'post_type'    => $this->postType,
         ];
@@ -201,6 +213,12 @@ class Importer implements ImporterInterface
                 throw new Exception\InvalidArgumentException(
                     '"authorId" parameter is not an integer.'
                 );
+            }
+            if (!empty($params['status']) && !in_array($params['status'], $this->validStatus)) {
+                throw new Exception\UnexpectedValueException(sprintf(
+                    '%s is not a valid status',
+                    $params['status']
+                ));
             }
             $this->entryParams = array_merge(
                 $this->entryParams,
