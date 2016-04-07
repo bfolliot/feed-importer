@@ -12,42 +12,61 @@ namespace BFolliot\FeedImporter;
 use WP_Query;
 use Zend\Feed\Reader\Entry\EntryInterface;
 use Zend\Feed\Reader\Reader;
-use InvalidArgumentException;
 
 class Importer implements ImporterInterface
 {
 
     /**
-     * @var callable
+     * @var string
      */
-    private $postInsertCallback;
+    protected $feedUri;
 
     /**
-     * @var callable
+     * @var string
      */
-    private $termInsertCallback;
+    protected $postType = 'post';
 
     /**
-     * { @inheritdoc }
+     * @var array
      */
-    public function import($uri, $postType = 'post', $taxonomyType = null, $language = false)
+    protected $entryParams = [
+        'afterInsertPost' => null,
+        'afterInsertTerm' => null,
+        'taxonomy'        => null,
+        'authorId'        => 1,
+    ];
+
+    /**
+     * __construct
+     *
+     * @param (string) $uri The URI to the feed (optional)
+     *
+     * @return self
+     */
+    public function __construct($feedUri = null)
     {
-        if (empty($uri) || !is_string($uri)) {
-            throw new InvalidArgumentException('Uri is required.');
-        }
-        if (!post_type_exists($postType)) {
-            throw new InvalidArgumentException(
-                sprintf('%s is not a valid post type.', $postType)
-            );
-        }
+        $this->setFeedUri($feedUri);
 
-        $feed = Reader::import($uri);
+        return $this;
+    }
 
+    /**
+     * @inheritDoc
+     *
+     */
+    public function import()
+    {
+        if (empty($this->feedUri) || !is_string($this->feedUri)) {
+            throw new Exception\UnexpectedValueException(sprintf(
+                'Feed uri not valid.'
+            ));
+        }
+        $feed = Reader::import($this->feedUri);
         foreach ($feed as $entry) {
-            if ($this->entryIsNew($entry, $postType, $language)) {
-                $postId = $this->createPostFromEntry($entry, $postType, $language);
-                if (!empty($taxonomyType)) {
-                    $this->createTermsFromEntry($postId, $entry, $taxonomyType, $language);
+            if ($this->entryIsNew($entry)) {
+                $postId = $this->createPostFromEntry($entry);
+                if (!empty($this->entryParams['taxonomy'])) {
+                    $this->createTermsFromEntry($postId, $entry);
                 }
             }
         }
@@ -57,15 +76,13 @@ class Importer implements ImporterInterface
      * Check if entry is new.
      *
      * @param EntryInterface $entry
-     * @param  string $postType The post type name, default to "post"
-     * @param  string $language Optionnal Polylang language
      *
      * @return bool
      */
-    private function entryIsNew(EntryInterface $entry, $postType = 'post', $language = false)
+    protected function entryIsNew(EntryInterface $entry)
     {
-        $queryArgs = [
-            'post_type'   => $postType,
+        $query = new WP_Query([
+            'post_type'   => $this->postType,
             'post_status' => 'any',
             'meta_query'  => [
                 [
@@ -73,26 +90,18 @@ class Importer implements ImporterInterface
                     'value'   => $entry->getId(),
                 ],
             ],
-        ];
-
-        if ($language) {
-            $queryArgs['lang'] = $language;
-        }
-
-        $query = new WP_Query($queryArgs);
+        ]);
         return ($query->post_count == 0);
     }
 
     /**
      * Create post from entry
-     * If you set a callable with setPostInsertCallback(),
-     * he will be triggered after insert with postId as parameter.
      *
      * @param EntryInterface $entry
-     * @param  string $postType The post type name, default to "post"
-     * @param  string $language Optionnal Polylang language
+     *
+     * @return int|WP_Error The post ID on success. The value 0 or WP_Error on failure.
      */
-    private function createPostFromEntry(EntryInterface $entry, $postType = 'post', $language = false)
+    protected function createPostFromEntry(EntryInterface $entry)
     {
         $date = (!empty($entry->getDateModified()))
             ? $entry->getDateModified()->format('Y-m-d H:i:s')
@@ -100,11 +109,11 @@ class Importer implements ImporterInterface
 
         // Create post object
         $postData = [
-          'post_author'  => 1,
-          'post_date'    => $date,
+          'post_author'  => $this->entryParams['authorId'],
           'post_content' => wp_kses_post($entry->getContent()),
+          'post_date'    => $date,
           'post_title'   => wp_strip_all_tags($entry->getTitle()),
-          'post_type'    => $postType,
+          'post_type'    => $this->postType,
         ];
 
         // Insert the post into the database
@@ -120,12 +129,8 @@ class Importer implements ImporterInterface
                 add_post_meta($postId, 'feed_importer_feed_entry_link', $entry->getAuthors()->getValues());
             }
 
-            if ($language && function_exists('pll_set_post_language')) {
-                pll_set_post_language($postId, $language);
-            }
-
-            if (is_callable($this->postInsertCallback)) {
-                call_user_func($this->postInsertCallback, $postId);
+            if (is_callable($this->entryParams['afterInsertPost'])) {
+                call_user_func($this->entryParams['afterInsertPost'], $postId);
             }
         }
 
@@ -137,23 +142,20 @@ class Importer implements ImporterInterface
      *
      * @param integer $postId
      * @param EntryInterface $entry
-     * @param string $taxonomyType The taxonomy type name
-     * @param  string $language Optionnal Polylang language
+     *
+     * @return array of term ids
      */
-    private function createTermsFromEntry($postId, EntryInterface $entry, $taxonomyType, $language = false)
+    protected function createTermsFromEntry($postId, EntryInterface $entry)
     {
         $ids = [];
         foreach ($entry->getCategories() as $category) {
-            $term = term_exists($category['term'], $taxonomyType);
+            $term = term_exists($category['term'], $this->entryParams['taxonomy']);
 
             if ($term === 0 || $term === null) {
-                $term = wp_insert_term($category['term'], $taxonomyType);
+                $term = wp_insert_term($category['term'], $this->entryParams['taxonomy']);
                 if (is_array($term)) {
-                    if ($language && function_exists('pll_set_term_language')) {
-                        pll_set_term_language($postId, $language);
-                    }
-                    if (is_callable($this->termInsertCallback)) {
-                        call_user_func($this->termInsertCallback, $term['term_id']);
+                    if (is_callable($this->entryParams['afterInsertTerm'])) {
+                        call_user_func($this->entryParams['afterInsertTerm'], $term['term_id']);
                     }
                 }
             }
@@ -161,34 +163,61 @@ class Importer implements ImporterInterface
             $ids[] = (int) $term['term_id'];
         }
         if (!empty($ids)) {
-            wp_set_post_terms($postId, $ids, $taxonomyType);
+            wp_set_post_terms($postId, $ids, $this->entryParams['taxonomy']);
         }
     }
 
     /**
-     * Sets the value of postInsertCallback.
+     * @inheritDoc
      *
-     * @param callable $postInsertCallback the post insert callback
-     *
-     * @return self
      */
-    public function setPostInsertCallback(callable $postInsertCallback)
+    public function configureEntry($postType = 'post', $params = [])
     {
-        $this->postInsertCallback = $postInsertCallback;
+        if (!post_type_exists($postType)) {
+            throw new Exception\UnexpectedValueException(sprintf(
+                '%s post type does not exist.'
+            ));
+        }
+        $this->postType = $postType;
+
+        if (!empty($params)) {
+            if (!empty($params['afterInsertPost']) && !is_callable($params['afterInsertPost'])) {
+                throw new Exception\InvalidArgumentException(
+                    '"afterInsertPost" parameter is not a callable.'
+                );
+            }
+            if (!empty($params['afterInsertTerm']) && !is_callable($params['afterInsertTerm'])) {
+                throw new Exception\InvalidArgumentException(
+                    '"afterInsertTerm" parameter is not a callable.'
+                );
+            }
+            if (!empty($params['taxonomy']) && !taxonomy_exists($params['taxonomy'])) {
+                throw new Exception\UnexpectedValueException(sprintf(
+                    '%s taxonomy does not exist.',
+                    $params['taxonomy']
+                ));
+            }
+            if (!empty($params['authorId']) && !is_int($params['authorId'])) {
+                throw new Exception\InvalidArgumentException(
+                    '"authorId" parameter is not an integer.'
+                );
+            }
+            $this->entryParams = array_merge(
+                $this->entryParams,
+                $params
+            );
+        }
 
         return $this;
     }
 
     /**
-     * Sets the value of termInsertCallback.
+     * @inheritDoc
      *
-     * @param callable $termInsertCallback the term insert callback
-     *
-     * @return self
      */
-    public function setTermInsertCallback(callable $termInsertCallback)
+    public function setFeedUri($feedUri)
     {
-        $this->termInsertCallback = $termInsertCallback;
+        $this->feedUri = $feedUri;
 
         return $this;
     }
