@@ -133,12 +133,12 @@ class Importer implements ImporterInterface
 
         // Add meta.
         if (is_int($postId)) {
-            add_post_meta($postId, 'feed_importer_feed_entry_id', $entry->getId());
+            add_post_meta($postId, 'feed_importer_feed_entry_id', wp_strip_all_tags($entry->getId()));
             if ($entry->getLink()) {
-                add_post_meta($postId, 'feed_importer_feed_entry_link', $entry->getLink());
+                add_post_meta($postId, 'feed_importer_feed_entry_link', wp_strip_all_tags($entry->getLink()));
             }
             if ($entry->getAuthors()) {
-                add_post_meta($postId, 'feed_importer_feed_entry_link', $entry->getAuthors()->getValues());
+                add_post_meta($postId, 'feed_importer_feed_entry_authors', wp_strip_all_tags($entry->getAuthors()->getValues()));
             }
 
             if (is_callable($this->entryParams['afterInsertPost'])) {
@@ -220,7 +220,7 @@ class Importer implements ImporterInterface
                     $params['status']
                 ));
             }
-            $this->entryParams = array_merge(
+            $this->entryParams = wp_parse_args(
                 $this->entryParams,
                 $params
             );

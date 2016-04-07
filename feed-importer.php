@@ -3,7 +3,7 @@
 Plugin Name: Feed importer
 Description: Import post from RSS or Atom feed.
 Plugin URI: https://github.com/bfolliot/feed-importer
-Version: 0.5.0
+Version: 0.6.0
 Author: Bryan Folliot
 Author URI: https://bryanfolliot.fr
 License: BSD-3-Clause
