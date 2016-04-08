@@ -138,7 +138,7 @@ class Importer implements ImporterInterface
                 add_post_meta($postId, 'feed_importer_feed_entry_link', wp_strip_all_tags($entry->getLink()));
             }
             if ($entry->getAuthors()) {
-                add_post_meta($postId, 'feed_importer_feed_entry_authors', wp_strip_all_tags($entry->getAuthors()->getValues()));
+                add_post_meta($postId, 'feed_importer_feed_entry_authors', $entry->getAuthors()->getValues());
             }
 
             if (is_callable($this->entryParams['afterInsertPost'])) {
@@ -220,9 +220,10 @@ class Importer implements ImporterInterface
                     $params['status']
                 ));
             }
+
             $this->entryParams = wp_parse_args(
-                $this->entryParams,
-                $params
+                $params,
+                $this->entryParams
             );
         }
 
