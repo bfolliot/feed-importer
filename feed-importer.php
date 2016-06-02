@@ -3,13 +3,13 @@
 Plugin Name: Feed importer
 Description: Import post from RSS or Atom feed.
 Plugin URI: https://github.com/bfolliot/feed-importer
-Version: 0.6.0
+Version: 0.6.2
 Author: Bryan Folliot
 Author URI: https://bryanfolliot.fr
 License: BSD-3-Clause
 */
 
-if (!class_exists('BFolliot\FeedImporter\Plugin')) {
+if (!class_exists('BFolliot\FeedImporter\Importer')) {
     if (file_exists(__DIR__ . '/vendor/autoload.php')) {
         include __DIR__ . '/vendor/autoload.php';
     } else {
